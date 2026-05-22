@@ -1,0 +1,203 @@
+// ============================================================
+// Module      : Robot Assignment Module
+// File        : RobotQueue.hpp
+// Data Structure: Circular Queue
+// Responsible : Member 2
+// Description : Manages robot task assignment using a circular
+//               queue. Ensures fair rotating distribution of
+//               tasks across all available robots. No STL used.
+// ============================================================
+
+#ifndef ROBOT_QUEUE_HPP
+#define ROBOT_QUEUE_HPP
+
+#include <cstring>
+#include <cstdio>
+#include <fstream>
+
+struct Robot {
+    char robotID[10];
+    char status[15];      // "Available", "Busy", "Maintenance"
+    char currentTask[10];
+};
+
+class CircularQueue {
+private:
+    static const int MAX_SIZE = 10;
+    Robot robots[MAX_SIZE];
+    int   front;                    // index of the first robot in the queue
+    int   rear;                     // index of the last robot in the queue
+    int   count;                    // number of robots currently in the queue
+    char  lastAssignedRobotID[10];  // set by assignTask(); read by main.cpp
+
+    void parseLine(char* line, char fields[][100], int& fieldCount) {
+        fieldCount = 0;
+        int ci = 0;
+        for (int i = 0; ; i++) {
+            char c = line[i];
+            if (c == ',' || c == '\0' || c == '\n' || c == '\r') {
+                fields[fieldCount][ci] = '\0';
+                fieldCount++;
+                ci = 0;
+                if (c == '\0' || c == '\n' || c == '\r') break;
+                if (fieldCount >= 10) break;
+            } else {
+                fields[fieldCount][ci++] = c;
+            }
+        }
+    }
+
+    // Returns the circular-queue index of the next Available robot, or -1
+    int findNextAvailableIndex() {
+        int busyCount  = 0;
+        int maintCount = 0;
+
+        for (int i = 0; i < count; i++) {
+            int idx = (front + i) % MAX_SIZE;
+
+            // Announce when the circular scan wraps past the end of the array
+            if (i > 0 && (front + i) % MAX_SIZE == 0) {
+                printf("[Circular Queue] Wrap-around: search resumed from index 0.\n");
+            }
+
+            if (strcmp(robots[idx].status, "Available") == 0) {
+                return idx;  // first available robot found
+            }
+            if (strcmp(robots[idx].status, "Busy") == 0)        busyCount++;
+            if (strcmp(robots[idx].status, "Maintenance") == 0) maintCount++;
+        }
+
+        // Diagnose why no robot is available
+        if (busyCount == count)
+            printf("All robots are currently busy.\n");
+        else if (maintCount == count)
+            printf("No robots available for maintenance.\n");
+        else
+            printf("All robots unavailable.\n");
+
+        return -1;
+    }
+
+public:
+    CircularQueue() : front(0), rear(-1), count(0) {
+        lastAssignedRobotID[0] = '\0';
+    }
+
+    bool isEmpty() { return count == 0; }
+    bool isFull()  { return count == MAX_SIZE; }
+
+    void enqueue(Robot r) {
+        if (isFull()) {
+            printf("Robot queue is full.\n");
+            return;
+        }
+        rear = (rear + 1) % MAX_SIZE;  // modulo wrap-around for circular behaviour
+        if (rear == 0 && count > 0) {
+            printf("[Circular Queue] Rear wrapped around to index 0.\n");
+        }
+        robots[rear] = r;
+        count++;
+    }
+
+    // Returns a copy of the next Available robot without removing it
+    Robot getNextAvailable() {
+        int idx = findNextAvailableIndex();
+        if (idx == -1) {
+            Robot empty;
+            empty.robotID[0]     = '\0';
+            empty.status[0]      = '\0';
+            empty.currentTask[0] = '\0';
+            return empty;
+        }
+        return robots[idx];
+    }
+
+    // Marks the next available robot Busy, assigns orderID, records its ID
+    void assignTask(char* orderID) {
+        int idx = findNextAvailableIndex();
+        if (idx == -1) {
+            lastAssignedRobotID[0] = '\0';
+            return;
+        }
+        strncpy(robots[idx].status, "Busy", 14);
+        robots[idx].status[14] = '\0';
+        strncpy(robots[idx].currentTask, orderID, 9);
+        robots[idx].currentTask[9] = '\0';
+        strncpy(lastAssignedRobotID, robots[idx].robotID, 9);
+        lastAssignedRobotID[9] = '\0';
+        printf("Robot %s assigned to order %s.\n",
+               robots[idx].robotID, orderID);
+    }
+
+    // Exposes the ID of the robot assigned in the most recent assignTask() call
+    const char* getLastAssignedRobotID() {
+        return lastAssignedRobotID;
+    }
+
+    void releaseRobot(char* robotID) {
+        for (int i = 0; i < count; i++) {
+            int idx = (front + i) % MAX_SIZE;
+            if (strcmp(robots[idx].robotID, robotID) == 0) {
+                strncpy(robots[idx].status, "Available", 14);
+                robots[idx].status[14]      = '\0';
+                robots[idx].currentTask[0]  = '\0';
+                printf("Robot %s released and set to Available.\n", robotID);
+                return;
+            }
+        }
+        printf("Robot not found: %s\n", robotID);
+    }
+
+    void displayAllRobots() {
+        printf("\n--- All Robots Status ---\n");
+        printf("  %-10s %-15s %-15s\n", "RobotID", "Status", "Current Task");
+        printf("  -----------------------------------------\n");
+        for (int i = 0; i < count; i++) {
+            int idx = (front + i) % MAX_SIZE;
+            const char* task = (robots[idx].currentTask[0] != '\0')
+                               ? robots[idx].currentTask : "(none)";
+            printf("  %-10s %-15s %-15s\n",
+                   robots[idx].robotID, robots[idx].status, task);
+        }
+        printf("\n");
+    }
+
+    void loadFromCSV(const char* filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            printf("Error: robots.csv not found\n");
+            return;
+        }
+
+        char line[256];
+        file.getline(line, 256);  // skip header row
+
+        while (file.getline(line, 256)) {
+            int len = strlen(line);
+            if (len > 0 && line[len - 1] == '\r') line[len - 1] = '\0';
+            if (strlen(line) == 0) continue;
+
+            char fields[5][100];
+            int fc = 0;
+            parseLine(line, fields, fc);
+            if (fc < 2) continue;
+
+            Robot r;
+            strncpy(r.robotID,     fields[0], 9);  r.robotID[9]     = '\0';
+            strncpy(r.status,      fields[1], 14); r.status[14]     = '\0';
+            // currentTask may be blank in CSV
+            if (fc >= 3 && strlen(fields[2]) > 0) {
+                strncpy(r.currentTask, fields[2], 9);
+                r.currentTask[9] = '\0';
+            } else {
+                r.currentTask[0] = '\0';
+            }
+
+            enqueue(r);
+        }
+        file.close();
+        printf("Robots loaded successfully.\n");
+    }
+};
+
+#endif // ROBOT_QUEUE_HPP

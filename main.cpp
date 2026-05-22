@@ -78,7 +78,23 @@ int main() {
     char assignedRobotID[10] = "";   // robot handling the current task
     char currentOrderID[10]  = "";   // order currently being processed
     bool taskInProgress      = false;
-    int  journeyCount        = 0;    // increments per completed journey for ID generation
+
+    // Initialize from existing log so journey IDs don't restart at J001 each run
+    int journeyCount = 0;
+    {
+        std::ifstream navLog("navigation.csv");
+        if (navLog.is_open()) {
+            char line[256];
+            navLog.getline(line, 256);  // skip header
+            while (navLog.getline(line, 256)) {
+                if (line[0] == 'J') {
+                    int n = atoi(line + 1);
+                    if (n > journeyCount) journeyCount = n;
+                }
+            }
+            navLog.close();
+        }
+    }
 
     int choice = 0;
     do {
@@ -107,6 +123,13 @@ int main() {
                 // Dequeue the next order, find the item, assign a robot, plan the route
                 if (taskInProgress) {
                     printf("A task is already in progress. Complete it first.\n");
+                    break;
+                }
+
+                // Check robot availability before consuming the order from the queue
+                Robot nextRobot = robotQueue.getNextAvailable();
+                if (strlen(nextRobot.robotID) == 0) {
+                    printf("No robot available. Order not removed from queue.\n");
                     break;
                 }
 
@@ -142,9 +165,16 @@ int main() {
                     break;
                 }
 
-                // Generate the navigation path using the shelf as destination
+                // Generate the navigation path; pass the item's zone so the DFS
+                // finds the correct shelf when the same shelf name exists in multiple zones
                 navigationStack.loadPathFromWarehouse(
-                    warehouseTree, "Warehouse", foundItem->shelf);
+                    warehouseTree, foundItem->zone, foundItem->shelf);
+
+                if (navigationStack.isEmpty()) {
+                    printf("Path not found for %s. Order cannot proceed.\n", foundItem->shelf);
+                    robotQueue.releaseRobot(assignedRobotID);
+                    break;
+                }
 
                 navigationStack.displayForwardPath();
                 taskInProgress = true;
