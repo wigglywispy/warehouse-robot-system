@@ -1,0 +1,9 @@
+itemID,itemName,zone,aisle,shelf
+ITM001,Laptop,Zone A,Aisle 1,Shelf 3
+ITM002,Headphones,Zone B,Aisle 2,Shelf 1
+ITM003,Keyboard,Zone C,Aisle 1,Shelf 5
+ITM004,Monitor,Zone A,Aisle 2,Shelf 2
+ITM005,Mouse,Zone B,Aisle 1,Shelf 4
+ITM006,Webcam,Zone C,Aisle 2,Shelf 2
+ITM007,USB Hub,Zone A,Aisle 1,Shelf 1
+ITM008,Speaker,Zone B,Aisle 3,Shelf 3

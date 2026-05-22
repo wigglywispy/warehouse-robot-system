@@ -1,0 +1,9 @@
+orderID,itemName,destination,status
+ORD001,Laptop,Zone A - Shelf 3,Pending
+ORD002,Headphones,Zone B - Shelf 1,Pending
+ORD003,Keyboard,Zone C - Shelf 5,Pending
+ORD004,Monitor,Zone A - Shelf 2,Pending
+ORD005,Mouse,Zone B - Shelf 4,Pending
+ORD006,Webcam,Zone C - Shelf 2,Pending
+ORD007,USB Hub,Zone A - Shelf 1,Pending
+ORD008,Speaker,Zone B - Shelf 3,Pending

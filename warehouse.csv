@@ -1,0 +1,22 @@
+nodeID,nodeName,nodeType,parentID
+1,Warehouse,Root,0
+2,Zone A,Zone,1
+3,Zone B,Zone,1
+4,Zone C,Zone,1
+5,Aisle 1,Aisle,2
+6,Aisle 2,Aisle,2
+7,Aisle 1,Aisle,3
+8,Aisle 2,Aisle,3
+9,Aisle 3,Aisle,3
+10,Aisle 1,Aisle,4
+11,Aisle 2,Aisle,4
+12,Shelf 1,Shelf,5
+13,Shelf 2,Shelf,5
+14,Shelf 3,Shelf,6
+15,Shelf 1,Shelf,7
+16,Shelf 2,Shelf,8
+17,Shelf 3,Shelf,8
+18,Shelf 4,Shelf,7
+19,Shelf 5,Shelf,10
+20,Shelf 2,Shelf,11
+21,Shelf 1,Shelf,5
