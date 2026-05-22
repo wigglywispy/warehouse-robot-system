@@ -1,14 +1,11 @@
 // ============================================================
-// System      : Warehouse Robot Navigation System
-// File        : main.cpp
-// Description : Main entry point. Integrates all 5 modules
-//               into one complete warehouse management system.
-// Members     : Member 1 (Task 1), Member 2 (Task 2),
-//               Member 3 (Task 3), Member 4 (Task 4),
-//               Member 5 (Task 5)
+// Warehouse Robot Navigation System
+// main.cpp - integrates all modules
+// Members: Member 1, Member 2, Member 3, Member 4, Member 5
 // ============================================================
 
-// WarehouseTree must be first — it defines Step, which Navigation.hpp uses
+// WarehouseTree.hpp must come first since it defines the Step struct
+// used by Navigation.hpp
 #include "WarehouseTree.hpp"
 #include "ItemBST.hpp"
 #include "OrderQueue.hpp"
@@ -19,7 +16,6 @@
 #include <cstdio>
 #include <fstream>
 
-// Print the main menu
 static void printMenu() {
     printf("\n");
     printf("========================================\n");
@@ -40,11 +36,11 @@ static void printMenu() {
     printf("Enter choice: ");
 }
 
-// Append one completed journey's forward steps to navigation.csv
+// write completed journey steps to navigation.csv
 static void logJourney(const char* journeyID, const char* robotID,
                         const char* orderID,
                         const Step* steps, int stepCount) {
-    std::ofstream navLog("navigation.csv", std::ios::app);  // append — preserve history
+    std::ofstream navLog("navigation.csv", std::ios::app);
     if (!navLog.is_open()) {
         printf("Warning: could not open navigation.csv for logging.\n");
         return;
@@ -67,7 +63,7 @@ int main() {
     CircularQueue    robotQueue;
     NavigationStack  navigationStack;
 
-    // Load all data sources before presenting the menu
+    // load all data before showing the menu
     printf("=== Loading System Data ===\n");
     warehouseTree.loadFromCSV("warehouse.csv");
     itemBST.loadFromCSV("items.csv");
@@ -75,11 +71,11 @@ int main() {
     robotQueue.loadFromCSV("robots.csv");
     printf("===========================\n");
 
-    char assignedRobotID[10] = "";   // robot handling the current task
-    char currentOrderID[10]  = "";   // order currently being processed
+    char assignedRobotID[10] = "";
+    char currentOrderID[10]  = "";
     bool taskInProgress      = false;
 
-    // Initialize from existing log so journey IDs don't restart at J001 each run
+    // count existing journeys in the log so IDs continue from where we left off
     int journeyCount = 0;
     {
         std::ifstream navLog("navigation.csv");
@@ -104,7 +100,7 @@ int main() {
         switch (choice) {
 
             case 1: {
-                // Add a new customer order to the queue
+                // add a new order to the queue
                 Order newOrder;
                 printf("Enter Order ID   : ");
                 scanf("%9s", newOrder.orderID);
@@ -120,13 +116,13 @@ int main() {
             }
 
             case 2: {
-                // Dequeue the next order, find the item, assign a robot, plan the route
+                // dequeue next order, find item, assign robot, plan path
                 if (taskInProgress) {
                     printf("A task is already in progress. Complete it first.\n");
                     break;
                 }
 
-                // Check robot availability before consuming the order from the queue
+                // check robot availability before removing order from queue
                 Robot nextRobot = robotQueue.getNextAvailable();
                 if (strlen(nextRobot.robotID) == 0) {
                     printf("No robot available. Order not removed from queue.\n");
@@ -135,7 +131,7 @@ int main() {
 
                 Order currentOrder = orderQueue.dequeue();
                 if (strlen(currentOrder.orderID) == 0) {
-                    break;  // dequeue already printed "No pending orders"
+                    break;
                 }
 
                 printf("\n--- Processing Order ---\n");
@@ -143,7 +139,7 @@ int main() {
                 printf("  Item       : %s\n", currentOrder.itemName);
                 printf("  Destination: %s\n", currentOrder.destination);
 
-                // Locate item in BST to get precise zone/aisle/shelf
+                // search for item in BST to get its exact location
                 Item* foundItem = itemBST.searchByName(currentOrder.itemName);
                 if (foundItem == nullptr) {
                     printf("Item not in warehouse inventory. Order cannot be processed.\n");
@@ -152,7 +148,6 @@ int main() {
                 printf("  Located at : Zone=%s | Aisle=%s | Shelf=%s\n",
                        foundItem->zone, foundItem->aisle, foundItem->shelf);
 
-                // Assign an available robot
                 strncpy(currentOrderID, currentOrder.orderID, 9);
                 currentOrderID[9] = '\0';
                 robotQueue.assignTask(currentOrderID);
@@ -165,8 +160,7 @@ int main() {
                     break;
                 }
 
-                // Generate the navigation path; pass the item's zone so the DFS
-                // finds the correct shelf when the same shelf name exists in multiple zones
+                // pass zone name so DFS picks the right shelf if duplicate names exist
                 navigationStack.loadPathFromWarehouse(
                     warehouseTree, foundItem->zone, foundItem->shelf);
 
@@ -184,13 +178,13 @@ int main() {
             }
 
             case 3: {
-                // Robot retraces its path, is released, and the order is closed
+                // robot retraces path back and order is marked complete
                 if (!taskInProgress) {
                     printf("No task is currently in progress.\n");
                     break;
                 }
 
-                // Retrieve the forward path before returnToStart() empties the stack
+                // save forward path before returnToStart() clears the stack
                 int pathCount = 0;
                 const Step* forwardSteps =
                     navigationStack.getForwardPath(pathCount);
@@ -199,7 +193,6 @@ int main() {
                 robotQueue.releaseRobot(assignedRobotID);
                 orderQueue.markCompleted(currentOrderID);
 
-                // Append this journey to navigation.csv
                 journeyCount++;
                 char journeyID[10];
                 snprintf(journeyID, sizeof(journeyID), "J%03d", journeyCount);
@@ -233,7 +226,7 @@ int main() {
                 char itemID[10];
                 printf("Enter Item ID: ");
                 scanf("%9s", itemID);
-                itemBST.search(itemID);  // prints result internally
+                itemBST.search(itemID);
                 break;
             }
 
@@ -241,7 +234,7 @@ int main() {
                 char itemName[30];
                 printf("Enter Item Name: ");
                 scanf(" %29[^\n]", itemName);
-                itemBST.searchByName(itemName);  // prints result internally
+                itemBST.searchByName(itemName);
                 break;
             }
 
@@ -255,11 +248,11 @@ int main() {
                 break;
 
             case 11:
-                printf("System shutting down. Goodbye.\n");
+                printf("Exiting system. Goodbye!\n");
                 break;
 
             default:
-                printf("Invalid option. Please enter a number between 1 and 11.\n");
+                printf("Invalid choice. Please enter a number between 1 and 11.\n");
         }
 
     } while (choice != 11);

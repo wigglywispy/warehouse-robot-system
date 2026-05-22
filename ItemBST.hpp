@@ -1,11 +1,9 @@
 // ============================================================
-// Module      : Item Search and Management Module
-// File        : ItemBST.hpp
-// Data Structure: Binary Search Tree (BST)
-// Responsible : Member 4
-// Description : Stores and manages warehouse items using a
-//               BST ordered by itemID. Enables fast item
-//               lookup, insertion, and deletion. No STL used.
+// Item Search and Management Module
+// Member 4
+// Binary Search Tree ordered by itemID.
+// Supports insert, search, delete, and inorder display.
+// No STL used.
 // ============================================================
 
 #ifndef ITEM_BST_HPP
@@ -48,7 +46,7 @@ private:
         return node;
     }
 
-    // Returns the leftmost (smallest) node in the subtree — used for deletion
+    // find the smallest node in a subtree (used in delete)
     BSTNode* findMin(BSTNode* node) {
         while (node->left != nullptr) node = node->left;
         return node;
@@ -62,12 +60,12 @@ private:
         } else if (cmp > 0) {
             node->right = deleteHelper(node->right, itemID);
         } else {
-            // Case 1: leaf node — just remove
+            // Case 1: no children
             if (node->left == nullptr && node->right == nullptr) {
                 delete node;
                 return nullptr;
             }
-            // Case 2: one child — bypass this node
+            // Case 2: one child
             if (node->left == nullptr) {
                 BSTNode* temp = node->right;
                 delete node;
@@ -78,7 +76,7 @@ private:
                 delete node;
                 return temp;
             }
-            // Case 3: two children — replace with inorder successor
+            // Case 3: two children - replace with inorder successor
             BSTNode* successor = findMin(node->right);
             node->data = successor->data;
             node->right = deleteHelper(node->right, successor->data.itemID);
@@ -112,7 +110,7 @@ private:
         return              searchHelper(node->right, itemID);
     }
 
-    // Linear scan via inorder traversal — BST order doesn't help for name search
+    // BST is ordered by ID so name search has to scan all nodes
     Item* searchByNameHelper(BSTNode* node, char* itemName) {
         if (node == nullptr) return nullptr;
         Item* leftResult = searchByNameHelper(node->left, itemName);
@@ -121,7 +119,7 @@ private:
         return searchByNameHelper(node->right, itemName);
     }
 
-    // Post-order deletion ensures children are freed before their parent
+    // free children before parent (post-order)
     void freeTree(BSTNode* node) {
         if (node == nullptr) return;
         freeTree(node->left);
@@ -211,7 +209,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header row
+        file.getline(line, 256);  // skip header
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -224,11 +222,11 @@ public:
             if (fc < 5) continue;
 
             Item item;
-            strncpy(item.itemID,   fields[0], 9);  item.itemID[9]   = '\0';
+            strncpy(item.itemID,   fields[0], 9);  item.itemID[9]    = '\0';
             strncpy(item.itemName, fields[1], 29); item.itemName[29] = '\0';
-            strncpy(item.zone,     fields[2], 9);  item.zone[9]     = '\0';
-            strncpy(item.aisle,    fields[3], 9);  item.aisle[9]    = '\0';
-            strncpy(item.shelf,    fields[4], 9);  item.shelf[9]    = '\0';
+            strncpy(item.zone,     fields[2], 9);  item.zone[9]      = '\0';
+            strncpy(item.aisle,    fields[3], 9);  item.aisle[9]     = '\0';
+            strncpy(item.shelf,    fields[4], 9);  item.shelf[9]     = '\0';
 
             insert(item);
         }

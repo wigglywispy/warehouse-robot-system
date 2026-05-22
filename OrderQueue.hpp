@@ -1,11 +1,9 @@
 // ============================================================
-// Module      : Order Management Module
-// File        : OrderQueue.hpp
-// Data Structure: Linear Queue
-// Responsible : Member 1
-// Description : Manages incoming customer orders using a
-//               linear queue. Ensures orders are processed
-//               in the order they arrive (FIFO). No STL used.
+// Module      : Order Management
+// Member      : Member 1
+// Data Structure: Queue (array-based, linear)
+// Description : Handles incoming customer orders using a queue.
+//               Orders are processed first-in first-out (FIFO).
 // ============================================================
 
 #ifndef ORDER_QUEUE_HPP
@@ -25,10 +23,10 @@ struct Order {
 class OrderQueue {
 private:
     static const int MAX_SIZE = 10;
-    Order orders[MAX_SIZE];  // backing array; elements are not shifted on dequeue
-    int   front;             // index of the next element to dequeue
-    int   rear;              // index of the last enqueued element (-1 = empty)
-    int   count;             // number of active (not yet dequeued) orders
+    Order orders[MAX_SIZE];
+    int   front;   // index of next order to dequeue
+    int   rear;    // index of last added order (-1 if empty)
+    int   count;   // number of active orders
 
     void parseLine(char* line, char fields[][100], int& fieldCount) {
         fieldCount = 0;
@@ -52,7 +50,7 @@ public:
 
     bool isEmpty() { return count == 0; }
 
-    // Full when rear has reached the last slot — linear queue limitation
+    // queue is full when rear reaches the end of the array
     bool isFull() { return rear == MAX_SIZE - 1; }
 
     void enqueue(Order o) {
@@ -64,7 +62,7 @@ public:
         count++;
     }
 
-    // Advances front without shifting; old slot remains for markCompleted() lookup
+    // dequeue moves front forward, old slot stays for markCompleted()
     Order dequeue() {
         if (isEmpty()) {
             printf("No pending orders.\n");
@@ -81,7 +79,7 @@ public:
         return o;
     }
 
-    // Shows only active (not yet dequeued) pending orders
+    // show orders that are still pending (from front to rear)
     void displayPending() {
         printf("\n--- Pending Orders ---\n");
         bool found = false;
@@ -97,7 +95,7 @@ public:
         printf("\n");
     }
 
-    // Scans entire backing array (including dequeued slots) for completed orders
+    // scan entire array including already-dequeued slots for completed ones
     void displayCompleted() {
         printf("\n--- Completed Orders ---\n");
         bool found = false;
@@ -113,7 +111,6 @@ public:
         printf("\n");
     }
 
-    // Scans full array (including dequeued slots) so a completed order is findable
     void markCompleted(char* orderID) {
         for (int i = 0; i <= rear; i++) {
             if (strcmp(orders[i].orderID, orderID) == 0) {
@@ -134,7 +131,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header row
+        file.getline(line, 256);  // skip header
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -147,10 +144,10 @@ public:
             if (fc < 4) continue;
 
             Order o;
-            strncpy(o.orderID,     fields[0], 9);  o.orderID[9]     = '\0';
-            strncpy(o.itemName,    fields[1], 29); o.itemName[29]   = '\0';
+            strncpy(o.orderID,     fields[0], 9);  o.orderID[9]      = '\0';
+            strncpy(o.itemName,    fields[1], 29); o.itemName[29]    = '\0';
             strncpy(o.destination, fields[2], 49); o.destination[49] = '\0';
-            strncpy(o.status,      fields[3], 14); o.status[14]     = '\0';
+            strncpy(o.status,      fields[3], 14); o.status[14]      = '\0';
 
             enqueue(o);
         }

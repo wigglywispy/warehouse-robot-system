@@ -1,11 +1,9 @@
 // ============================================================
-// Module      : Robot Navigation and Path Tracking Module
-// File        : Navigation.hpp
-// Data Structure: Stack
-// Responsible : Member 3
-// Description : Records robot movement steps using a stack.
-//               Enables reverse path retracing for robot
-//               return journey using LIFO behaviour. No STL.
+// Navigation & Path Tracking Module
+// Member 3
+// Stack (array-based, LIFO) - records each step the robot takes
+// so it can retrace back to start by popping in reverse order.
+// No STL used.
 // ============================================================
 
 #ifndef NAVIGATION_HPP
@@ -13,14 +11,14 @@
 
 #include <cstring>
 #include <cstdio>
-#include "WarehouseTree.hpp"  // Step struct + WarehouseTree class defined there
+#include "WarehouseTree.hpp"
 
 class NavigationStack {
 private:
     static const int MAX_SIZE = 20;
-    Step steps[MAX_SIZE];        // fixed-size LIFO storage
-    int  top;                    // index of top element; -1 when empty
-    Step forwardPath[MAX_SIZE];  // backup of loaded path for post-return logging
+    Step steps[MAX_SIZE];
+    int  top;
+    Step forwardPath[MAX_SIZE];  // copy of path for CSV logging after return
     int  forwardCount;
 
 public:
@@ -41,7 +39,7 @@ public:
         if (isEmpty()) {
             printf("No steps to retrace.\n");
             Step empty;
-            empty.stepNumber  = -1;
+            empty.stepNumber   = -1;
             empty.direction[0] = '\0';
             empty.location[0]  = '\0';
             return empty;
@@ -60,7 +58,7 @@ public:
         return steps[top];
     }
 
-    // Print all steps bottom-to-top (index 0 = first move taken)
+    // print path from bottom to top (step 1 first)
     void displayForwardPath() {
         if (isEmpty()) {
             printf("Navigation stack is empty.\n");
@@ -76,7 +74,7 @@ public:
         printf("--------------------------------\n\n");
     }
 
-    // Pop every step and print the reverse instruction for each
+    // pop steps and print reverse direction for each one
     void returnToStart() {
         if (isEmpty()) {
             printf("No steps to retrace.\n");
@@ -97,16 +95,16 @@ public:
     }
 
     void clearStack() {
-        top = -1;  // fixed array — reset index only
+        top = -1;
     }
 
-    // Expose the saved forward path so main.cpp can log it after returnToStart()
+    // expose saved forward path so main can log it after returnToStart()
     const Step* getForwardPath(int& count) {
         count = forwardCount;
         return forwardPath;
     }
 
-    // Integration point: query WarehouseTree for the path then push each step
+    // query warehouse tree for path, then push each step onto the stack
     void loadPathFromWarehouse(WarehouseTree& tree,
                                 const char* startZone,
                                 const char* destination) {
@@ -123,7 +121,7 @@ public:
 
         for (int i = 0; i < stepCount && i < MAX_SIZE; i++) {
             push(pathSteps[i]);
-            forwardPath[i] = pathSteps[i];  // save backup for CSV logging
+            forwardPath[i] = pathSteps[i];
         }
         forwardCount = (stepCount < MAX_SIZE) ? stepCount : MAX_SIZE;
     }

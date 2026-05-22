@@ -1,13 +1,10 @@
 // ============================================================
-// Module      : Warehouse Layout and Navigation Module
-// File        : WarehouseTree.hpp
-// Data Structure: General Tree (N-ary)
-// Responsible : Member 5
-// Description : Models the physical warehouse layout as a
-//               hierarchical tree: Root -> Zones -> Aisles ->
-//               Shelves. Provides path generation for robot
-//               navigation integrated with the Stack module.
-//               No STL used.
+// Warehouse Layout Module
+// Member 5
+// General tree (N-ary): Root -> Zones -> Aisles -> Shelves
+// Used by the navigation module to generate robot paths.
+// DFS is used to find a path from root to the target shelf.
+// No STL used.
 // ============================================================
 
 #ifndef WAREHOUSE_TREE_HPP
@@ -18,8 +15,7 @@
 #include <cstdlib>
 #include <fstream>
 
-// Step defined here because WarehouseTree::findPath produces Steps
-// that NavigationStack (Navigation.hpp) consumes after including this header
+// Step is defined here because Navigation.hpp needs it
 struct Step {
     int  stepNumber;
     char direction[15];  // "Forward", "Left", "Right", "Backward"
@@ -28,8 +24,8 @@ struct Step {
 
 struct TreeNode {
     char      name[50];
-    char      type[15];           // "Root", "Zone", "Aisle", "Shelf"
-    TreeNode* children[10];       // fixed array — no STL
+    char      type[15];        // "Root", "Zone", "Aisle", "Shelf"
+    TreeNode* children[10];
     int       childCount;
 };
 
@@ -38,9 +34,9 @@ private:
     static const int MAX_NODES = 100;
 
     TreeNode* root;
-    TreeNode* nodeTable[MAX_NODES];  // flat store for CSV-loaded nodes
-    int       nodeIDs[MAX_NODES];    // parallel: CSV nodeID per slot
-    int       parentIDs[MAX_NODES];  // parallel: CSV parentID per slot
+    TreeNode* nodeTable[MAX_NODES];
+    int       nodeIDs[MAX_NODES];
+    int       parentIDs[MAX_NODES];
     int       tableSize;
 
     TreeNode* createNode(const char* name, const char* type) {
@@ -59,10 +55,9 @@ private:
             parent->children[parent->childCount++] = child;
     }
 
-    // Recursive DFS — returns true and fills pathNodes when target is found.
-    // zoneFilter: when non-empty, only accepts a match whose path passes through
-    // a Zone node with that name, preventing duplicate shelf names across zones
-    // from resolving to the wrong location.
+    // recursive DFS - fills pathNodes when the target shelf is found
+    // zoneFilter makes sure we only match shelves inside the correct zone
+    // (needed when two zones have a shelf with the same name)
     bool tracePath(TreeNode* current, const char* target,
                    const char* zoneFilter,
                    TreeNode* pathNodes[], int& pathLen) {
@@ -86,10 +81,11 @@ private:
             if (tracePath(current->children[i], target, zoneFilter, pathNodes, pathLen))
                 return true;
         }
-        pathLen--;  // backtrack: not on path to target
+        pathLen--;  // backtrack
         return false;
     }
 
+    // free tree memory post-order (children before parent)
     void freeTree(TreeNode* node) {
         if (node == nullptr) return;
         for (int i = 0; i < node->childCount; i++)
@@ -97,10 +93,9 @@ private:
         delete node;
     }
 
-    // Parse one CSV line into fields[], splitting on commas
     void parseLine(char* line, char fields[][100], int& fieldCount) {
         fieldCount = 0;
-        int ci = 0;  // character position within the current field
+        int ci = 0;
         for (int i = 0; ; i++) {
             char c = line[i];
             if (c == ',' || c == '\0' || c == '\n' || c == '\r') {
@@ -130,7 +125,6 @@ public:
 
     TreeNode* getRoot() { return root; }
 
-    // Print the tree with 4-space indentation per depth level
     void displayLayout(TreeNode* node, int depth) {
         if (node == nullptr) {
             if (depth == 0) printf("Warehouse layout not loaded.\n");
@@ -142,8 +136,7 @@ public:
             displayLayout(node->children[i], depth + 1);
     }
 
-    // DFS from root to destinationName; converts each path node into a Step
-    // Returns pointer to a static Step array; sets stepCount
+    // runs DFS from root to find destinationName and converts nodes into Steps
     Step* findPath(const char* startName, const char* destinationName,
                    int& stepCount) {
         stepCount = 0;
@@ -162,7 +155,7 @@ public:
         }
 
         static Step steps[50];
-        int aisleCount = 0;  // alternates Left/Right for each aisle encountered
+        int aisleCount = 0;
 
         for (int i = 0; i < pathLen; i++) {
             steps[stepCount].stepNumber = stepCount + 1;
@@ -170,14 +163,13 @@ public:
             steps[stepCount].location[49] = '\0';
 
             if (strcmp(pathNodes[i]->type, "Aisle") == 0) {
-                // Even-indexed aisles turn Left, odd turn Right
+                // alternate left and right for each aisle
                 if (aisleCount % 2 == 0)
                     strncpy(steps[stepCount].direction, "Left", 14);
                 else
                     strncpy(steps[stepCount].direction, "Right", 14);
                 aisleCount++;
             } else {
-                // Root, Zone, Shelf all move Forward
                 strncpy(steps[stepCount].direction, "Forward", 14);
             }
             steps[stepCount].direction[14] = '\0';
@@ -195,7 +187,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header row
+        file.getline(line, 256);  // skip header
 
         tableSize = 0;
         while (file.getline(line, 256) && tableSize < MAX_NODES) {
@@ -220,10 +212,10 @@ public:
         }
         file.close();
 
-        // Second pass: link each node to its parent
+        // second pass: link each node to its parent
         for (int i = 0; i < tableSize; i++) {
             if (parentIDs[i] == 0) {
-                root = nodeTable[i];  // parentID 0 marks the root
+                root = nodeTable[i];  // node with parentID 0 is the root
                 continue;
             }
             bool parentFound = false;
