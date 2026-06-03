@@ -1,8 +1,4 @@
 journeyID,robotID,orderID,stepNumber,direction,location
-J001,ROB001,ORD001,1,Forward,Warehouse Entrance
-J001,ROB001,ORD001,2,Forward,Zone A
-J001,ROB001,ORD001,3,Left,Aisle 1
-J001,ROB001,ORD001,4,Forward,Shelf 3
 J001,ROB001,ORD001,1,Forward,Warehouse
 J001,ROB001,ORD001,2,Forward,Zone A
 J001,ROB001,ORD001,3,Left,Aisle 2

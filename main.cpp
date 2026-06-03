@@ -554,6 +554,19 @@ public:
         return result;
     }
 
+    // look at the front order without removing it
+    Order peekFront() {
+        if (isEmpty()) {
+            Order empty;
+            empty.orderID[0]     = '\0';
+            empty.itemName[0]    = '\0';
+            empty.destination[0] = '\0';
+            empty.status[0]      = '\0';
+            return empty;
+        }
+        return front->data;
+    }
+
     // show orders still waiting in the pending queue
     void displayPending() {
         printf("\n--- Pending Orders ---\n");
@@ -661,21 +674,19 @@ private:
     int   rear;
     int   count;
     char  lastAssignedRobotID[10];
+    int   rotationStart;  // logical offset for fair round-robin robot selection
 
-    // find the index of the next available robot, returns -1 if none found
-    int findNextAvailableIndex() {
+    // returns logical position (0..count-1) of the next available robot, -1 if none
+    int findNextAvailableLogical() {
         int busyCount  = 0;
         int maintCount = 0;
 
         for (int i = 0; i < count; i++) {
-            int idx = (front + i) % MAX_SIZE;
-
-            if (i > 0 && (front + i) % MAX_SIZE == 0) {
-                printf("[Circular Queue] Wrap-around: search resumed from index 0.\n");
-            }
+            int logPos = (rotationStart + i) % count;
+            int idx    = (front + logPos) % MAX_SIZE;
 
             if (strcmp(robots[idx].status, "Available") == 0) {
-                return idx;
+                return logPos;
             }
             if (strcmp(robots[idx].status, "Busy") == 0)        busyCount++;
             if (strcmp(robots[idx].status, "Maintenance") == 0) maintCount++;
@@ -693,7 +704,7 @@ private:
     }
 
 public:
-    CircularQueue() : front(0), rear(-1), count(0) {
+    CircularQueue() : front(0), rear(-1), count(0), rotationStart(0) {
         lastAssignedRobotID[0] = '\0';
     }
 
@@ -715,29 +726,32 @@ public:
 
     // returns a copy of the next available robot without removing it
     Robot getNextAvailable() {
-        int idx = findNextAvailableIndex();
-        if (idx == -1) {
+        int logPos = findNextAvailableLogical();
+        if (logPos == -1) {
             Robot empty;
             empty.robotID[0]     = '\0';
             empty.status[0]      = '\0';
             empty.currentTask[0] = '\0';
             return empty;
         }
-        return robots[idx];
+        return robots[(front + logPos) % MAX_SIZE];
     }
 
     void assignTask(char* orderID) {
-        int idx = findNextAvailableIndex();
-        if (idx == -1) {
+        int logPos = findNextAvailableLogical();
+        if (logPos == -1) {
             lastAssignedRobotID[0] = '\0';
             return;
         }
+        int idx = (front + logPos) % MAX_SIZE;
         strncpy(robots[idx].status, "Busy", 14);
         robots[idx].status[14] = '\0';
         strncpy(robots[idx].currentTask, orderID, 9);
         robots[idx].currentTask[9] = '\0';
         strncpy(lastAssignedRobotID, robots[idx].robotID, 9);
         lastAssignedRobotID[9] = '\0';
+        // advance rotation so the next call starts after this robot
+        rotationStart = (logPos + 1) % count;
         printf("Robot %s assigned to order %s.\n",
                robots[idx].robotID, orderID);
     }
@@ -1058,35 +1072,53 @@ int main() {
             }
 
             case 2: {
-                // dequeue next order, find item, assign robot, plan path
+                // validate everything before touching the queue or robot state
                 if (taskInProgress) {
                     printf("A task is already in progress. Complete it first.\n");
                     break;
                 }
 
-                // check robot availability before removing order from queue
+                // peek at the front order without removing it
+                Order peeked = orderQueue.peekFront();
+                if (strlen(peeked.orderID) == 0) {
+                    printf("No pending orders.\n");
+                    break;
+                }
+
+                // confirm item exists in BST before committing to the order
+                Item* foundItem = itemBST.searchByName(peeked.itemName);
+                if (foundItem == nullptr) {
+                    printf("Item '%s' not in inventory. Order %s removed from queue.\n",
+                           peeked.itemName, peeked.orderID);
+                    orderQueue.dequeue();  // order can never be fulfilled; drop it
+                    break;
+                }
+
+                // confirm a path exists to the shelf before committing
+                int testSteps = 0;
+                Step* testPath = warehouseTree.findPath(
+                    foundItem->zone, foundItem->shelf, testSteps);
+                if (testPath == nullptr || testSteps == 0) {
+                    printf("No path to '%s'. Order %s removed from queue.\n",
+                           foundItem->shelf, peeked.orderID);
+                    orderQueue.dequeue();  // order can never be routed; drop it
+                    break;
+                }
+
+                // confirm a robot is free before removing the order
                 Robot nextRobot = robotQueue.getNextAvailable();
                 if (strlen(nextRobot.robotID) == 0) {
                     printf("No robot available. Order not removed from queue.\n");
                     break;
                 }
 
+                // all checks passed — now safely dequeue and begin the task
                 Order currentOrder = orderQueue.dequeue();
-                if (strlen(currentOrder.orderID) == 0) {
-                    break;
-                }
 
                 printf("\n--- Processing Order ---\n");
                 printf("  Order ID   : %s\n", currentOrder.orderID);
                 printf("  Item       : %s\n", currentOrder.itemName);
                 printf("  Destination: %s\n", currentOrder.destination);
-
-                // search for item in BST to get its exact location
-                Item* foundItem = itemBST.searchByName(currentOrder.itemName);
-                if (foundItem == nullptr) {
-                    printf("Item not in warehouse inventory. Order cannot be processed.\n");
-                    break;
-                }
                 printf("  Located at : Zone=%s | Aisle=%s | Shelf=%s\n",
                        foundItem->zone, foundItem->aisle, foundItem->shelf);
 
@@ -1097,20 +1129,9 @@ int main() {
                         robotQueue.getLastAssignedRobotID(), 9);
                 assignedRobotID[9] = '\0';
 
-                if (strlen(assignedRobotID) == 0) {
-                    printf("No robot available. Order cannot proceed.\n");
-                    break;
-                }
-
                 // pass zone name so DFS picks the right shelf if duplicate names exist
                 navigationStack.loadPathFromWarehouse(
                     warehouseTree, foundItem->zone, foundItem->shelf);
-
-                if (navigationStack.isEmpty()) {
-                    printf("Path not found for %s. Order cannot proceed.\n", foundItem->shelf);
-                    robotQueue.releaseRobot(assignedRobotID);
-                    break;
-                }
 
                 navigationStack.displayForwardPath();
                 taskInProgress = true;
