@@ -1,11 +1,19 @@
-// ============================================================
 // Warehouse Robot Navigation System
+<<<<<<< Updated upstream
 // CT077-3-2-DSTR (Data Structures)
 // Members: Member 1, Member 2, Member 3, Member 4, Member 5
 // ============================================================
 // RENAME THIS FILE to: <GroupNo>_<leaderID>_<member1ID>_<member2ID>.cpp
 // before submitting (e.g. G1_TP012345_TP012344_TP012123.cpp)
 // ============================================================
+=======
+// All module intergration
+
+#include "ItemBST.hpp"
+#include "OrderQueue.hpp"
+#include "RobotQueue.hpp"
+#include "Navigation.hpp"
+>>>>>>> Stashed changes
 
 #include <cstring>
 #include <cstdio>
@@ -1090,6 +1098,15 @@ int main() {
                 printf("  Located at : Zone=%s | Aisle=%s | Shelf=%s\n",
                        foundItem->zone, foundItem->aisle, foundItem->shelf);
 
+                char blockedLocation[50] = "";  // No input prevention
+                printf("Enter obstacle location to simulate (NONE for no obstacle): ");
+                scanf(" %49[^\n]", blockedLocation);
+                if (strcmp(blockedLocation, "NONE") == 0 ||
+                    strcmp(blockedLocation, "none") == 0 ||
+                    strcmp(blockedLocation, "None") == 0) {
+                    blockedLocation[0] = '\0';
+                }
+
                 strncpy(currentOrderID, currentOrder.orderID, 9);
                 currentOrderID[9] = '\0';
                 robotQueue.assignTask(currentOrderID);
@@ -1104,10 +1121,11 @@ int main() {
 
                 // pass zone name so DFS picks the right shelf if duplicate names exist
                 navigationStack.loadPathFromWarehouse(
-                    warehouseTree, foundItem->zone, foundItem->shelf);
+                    warehouseTree, foundItem->zone, foundItem->shelf, blockedLocation);
 
                 if (navigationStack.isEmpty()) {
-                    printf("Path not found for %s. Order cannot proceed.\n", foundItem->shelf);
+                    printf("Navigation could not continue for %s. Order cannot proceed.\n",
+                           foundItem->shelf);
                     robotQueue.releaseRobot(assignedRobotID);
                     break;
                 }

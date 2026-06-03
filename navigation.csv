@@ -11,3 +11,10 @@ J002,ROB001,ORD001,1,Forward,Warehouse
 J002,ROB001,ORD001,2,Forward,Zone A
 J002,ROB001,ORD001,3,Left,Aisle 2
 J002,ROB001,ORD001,4,Forward,Shelf 3
+<<<<<<< Updated upstream
+=======
+J003,ROB001,ORD001,1,Forward,Warehouse
+J003,ROB001,ORD001,2,Forward,Zone A
+J003,ROB001,ORD001,3,Left,Aisle 2
+J003,ROB001,ORD001,4,Forward,Shelf 3
+>>>>>>> Stashed changes

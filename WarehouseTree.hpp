@@ -1,11 +1,5 @@
-// ============================================================
-// Warehouse Layout Module
-// Member 5
-// General tree (N-ary): Root -> Zones -> Aisles -> Shelves
-// Used by the navigation module to generate robot paths.
-// DFS is used to find a path from root to the target shelf.
-// No STL used.
-// ============================================================
+// WAREHOUSE LAYOUT AND NAVIGATION MODULE
+// Task 5
 
 #ifndef WAREHOUSE_TREE_HPP
 #define WAREHOUSE_TREE_HPP

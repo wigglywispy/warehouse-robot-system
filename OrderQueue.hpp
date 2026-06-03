@@ -50,13 +50,20 @@ public:
 
     bool isEmpty() { return count == 0; }
 
-    // queue is full when rear reaches the end of the array
-    bool isFull() { return rear == MAX_SIZE - 1; }
+    // queue is full when all 10 slots are occupied
+    bool isFull() { return count == MAX_SIZE; }
 
     void enqueue(Order o) {
         if (isFull()) {
             printf("Order queue is full.\n");
             return;
+        }
+        // if rear hit the end but slots are free at the front, shift everything left
+        if (rear == MAX_SIZE - 1) {
+            for (int i = front; i <= rear; i++)
+                orders[i - front] = orders[i];
+            rear  = rear - front;
+            front = 0;
         }
         orders[++rear] = o;
         count++;
