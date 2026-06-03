@@ -1,10 +1,9 @@
 // ============================================================
 // Warehouse Robot Navigation System
 // CT077-3-2-DSTR (Data Structures)
-// Members: Member 1, Member 2, Member 3, Member 4, Member 5
-// ============================================================
-// RENAME THIS FILE to: <GroupNo>_<leaderID>_<member1ID>_<member2ID>.cpp
-// before submitting (e.g. G1_TP012345_TP012344_TP012123.cpp)
+// Group  : G22
+// Members: TP077824, TP080775, TP080003, TP079178, TP079462
+// File   : G22_TP077824_TP080775_TP080003_TP079178_TP079462(main).cpp
 // ============================================================
 
 #include <cstring>
@@ -987,7 +986,8 @@ static void printMenu() {
     printf("[8]  Search Item by Name\n");
     printf("[9]  Display Warehouse Layout\n");
     printf("[10] Display All Items (Inorder)\n");
-    printf("[11] Exit\n");
+    printf("[11] Delete Item by ID\n");
+    printf("[12] Exit\n");
     printf("========================================\n");
     printf("Enter choice: ");
 }
@@ -996,7 +996,7 @@ static void printMenu() {
 static void logJourney(const char* journeyID, const char* robotID,
                         const char* orderID,
                         const Step* steps, int stepCount) {
-    std::ofstream navLog("navigation.csv", std::ios::app);
+    std::ofstream navLog("G22_TP077824_TP080775_TP080003_TP079178_TP079462(navigation).csv", std::ios::app);
     if (!navLog.is_open()) {
         printf("Warning: could not open navigation.csv for logging.\n");
         return;
@@ -1021,10 +1021,10 @@ int main() {
 
     // load all data before showing the menu
     printf("=== Loading System Data ===\n");
-    warehouseTree.loadFromCSV("warehouse.csv");
-    itemBST.loadFromCSV("items.csv");
-    orderQueue.loadFromCSV("orders.csv");
-    robotQueue.loadFromCSV("robots.csv");
+    warehouseTree.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(warehouse).csv");
+    itemBST.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(items).csv");
+    orderQueue.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(orders).csv");
+    robotQueue.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(robots).csv");
     printf("===========================\n");
 
     char assignedRobotID[10] = "";
@@ -1034,7 +1034,7 @@ int main() {
     // count existing journeys in the log so IDs continue from where we left off
     int journeyCount = 0;
     {
-        std::ifstream navLog("navigation.csv");
+        std::ifstream navLog("G22_TP077824_TP080775_TP080003_TP079178_TP079462(navigation).csv");
         if (navLog.is_open()) {
             char line[256];
             navLog.getline(line, 256);  // skip header
@@ -1210,15 +1210,26 @@ int main() {
                 itemBST.displayInOrder();
                 break;
 
-            case 11:
+            case 11: {
+                char delID[10];
+                printf("Enter Item ID to delete: ");
+                scanf("%9s", delID);
+                if (itemBST.search(delID) != nullptr) {
+                    itemBST.deleteItem(delID);
+                    printf("Item %s deleted successfully.\n", delID);
+                }
+                break;
+            }
+
+            case 12:
                 printf("Exiting system. Goodbye!\n");
                 break;
 
             default:
-                printf("Invalid choice. Please enter a number between 1 and 11.\n");
+                printf("Invalid choice. Please enter a number between 1 and 12.\n");
         }
 
-    } while (choice != 11);
+    } while (choice != 12);
 
     return 0;
 }
