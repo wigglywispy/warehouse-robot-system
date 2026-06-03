@@ -1,10 +1,5 @@
-// ================================================================
-// Robot Assignment Module
-// Member 2
-// Uses a circular queue (array-based) to assign tasks to robots.
-// Robots rotate fairly so the same one doesn't always get picked.
-// No STL used.
-// ================================================================
+// ROBOT ASSIGNMENT MODULE 
+// Task 2
 
 #ifndef ROBOT_QUEUE_HPP
 #define ROBOT_QUEUE_HPP
