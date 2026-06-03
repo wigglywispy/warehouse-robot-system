@@ -1,5 +1,4 @@
-// ============================================================
-// Warehouse Robot Navigation System
+﻿// Warehouse Robot Navigation System
 // CT077-3-2-DSTR (Data Structures)
 // Group  : G22
 // Members: TP077824, TP080775, TP080003, TP079178, TP079462
@@ -13,8 +12,8 @@
 
 // ============================================================
 // UTILITY
-// Shared CSV parser used by all modules.
-// maxFields caps writes so callers never overflow their array.
+// Small CSV helper used by the loaders.
+// maxFields keeps the caller's array safe.
 // ============================================================
 
 static void parseLine(char* line, char fields[][100], int maxFields, int& fieldCount) {
@@ -29,7 +28,7 @@ static void parseLine(char* line, char fields[][100], int maxFields, int& fieldC
             if (c == '\0' || c == '\n' || c == '\r') break;
             if (fieldCount >= maxFields) break;
         } else {
-            // guard against field characters overflowing the 100-char slot
+            // keep each CSV field inside the fixed buffer
             if (ci < 99) fields[fieldCount][ci++] = c;
         }
     }
@@ -38,12 +37,12 @@ static void parseLine(char* line, char fields[][100], int maxFields, int& fieldC
 // ============================================================
 // MODULE: Warehouse Layout
 // Member 5
-// General tree (N-ary): Root -> Zones -> Aisles -> Shelves
-// DFS is used to find a path from root to the target shelf.
+// General tree: Root -> Zones -> Aisles -> Shelves
+// DFS is used to trace the route to a shelf.
 // No STL used.
 // ============================================================
 
-// Step is defined here because NavigationStack needs it
+// One movement step in the robot path
 struct Step {
     int  stepNumber;
     char direction[15];  // "Forward", "Left", "Right", "Backward"
@@ -83,9 +82,8 @@ private:
             parent->children[parent->childCount++] = child;
     }
 
-    // recursive DFS - fills pathNodes when the target shelf is found
-    // zoneFilter makes sure we only match shelves inside the correct zone
-    // (needed when two zones have a shelf with the same name)
+    // DFS records the path once the matching shelf is found.
+    // zoneFilter avoids choosing a shelf from the wrong zone.
     bool tracePath(TreeNode* current, const char* target,
                    const char* zoneFilter,
                    TreeNode* pathNodes[], int& pathLen) {
@@ -109,11 +107,11 @@ private:
             if (tracePath(current->children[i], target, zoneFilter, pathNodes, pathLen))
                 return true;
         }
-        pathLen--;  // backtrack
+        pathLen--;  // go back one level
         return false;
     }
 
-    // free tree memory post-order (children before parent)
+    // delete child nodes before deleting the parent
     void freeTree(TreeNode* node) {
         if (node == nullptr) return;
         for (int i = 0; i < node->childCount; i++)
@@ -147,7 +145,7 @@ public:
             displayLayout(node->children[i], depth + 1);
     }
 
-    // runs DFS from root to find destinationName and converts nodes into Steps
+    // find the destination shelf and convert the route into robot steps
     Step* findPath(const char* startName, const char* destinationName,
                    int& stepCount) {
         stepCount = 0;
@@ -174,7 +172,7 @@ public:
             steps[stepCount].location[49] = '\0';
 
             if (strcmp(pathNodes[i]->type, "Aisle") == 0) {
-                // alternate left and right for each aisle
+                // aisles alternate between left and right turns
                 if (aisleCount % 2 == 0)
                     strncpy(steps[stepCount].direction, "Left", 14);
                 else
@@ -198,7 +196,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);  // skip CSV header
 
         tableSize = 0;
         while (file.getline(line, 256) && tableSize < MAX_NODES) {
@@ -223,10 +221,10 @@ public:
         }
         file.close();
 
-        // second pass: link each node to its parent
+        // link every node back to its parent
         for (int i = 0; i < tableSize; i++) {
             if (parentIDs[i] == 0) {
-                root = nodeTable[i];  // node with parentID 0 is the root
+                root = nodeTable[i];  // parentID 0 marks the root
                 continue;
             }
             bool parentFound = false;
@@ -250,8 +248,8 @@ public:
 // ============================================================
 // MODULE: Item Search and Management
 // Member 4
-// Binary Search Tree ordered by itemID.
-// Supports insert, search, delete, and inorder display.
+// Binary Search Tree sorted by itemID.
+// Handles insert, search, delete, and display.
 // No STL used.
 // ============================================================
 
@@ -288,7 +286,7 @@ private:
         return node;
     }
 
-    // find the smallest node in a subtree (used in delete)
+    // smallest node is used when deleting a node with two children
     BSTNode* findMin(BSTNode* node) {
         while (node->left != nullptr) node = node->left;
         return node;
@@ -302,12 +300,12 @@ private:
         } else if (cmp > 0) {
             node->right = deleteHelper(node->right, itemID);
         } else {
-            // Case 1: no children
+            // no children
             if (node->left == nullptr && node->right == nullptr) {
                 delete node;
                 return nullptr;
             }
-            // Case 2: one child
+            // one child
             if (node->left == nullptr) {
                 BSTNode* temp = node->right;
                 delete node;
@@ -318,7 +316,7 @@ private:
                 delete node;
                 return temp;
             }
-            // Case 3: two children - replace with inorder successor
+            // two children: replace with inorder successor
             BSTNode* successor = findMin(node->right);
             node->data = successor->data;
             node->right = deleteHelper(node->right, successor->data.itemID);
@@ -352,7 +350,7 @@ private:
         return              searchHelper(node->right, itemID);
     }
 
-    // BST is ordered by ID so name search has to scan all nodes
+    // name search checks the whole tree because the key is itemID
     Item* searchByNameHelper(BSTNode* node, char* itemName) {
         if (node == nullptr) return nullptr;
         Item* leftResult = searchByNameHelper(node->left, itemName);
@@ -361,7 +359,7 @@ private:
         return searchByNameHelper(node->right, itemName);
     }
 
-    // free children before parent (post-order)
+    // clear child nodes before the parent node
     void freeTree(BSTNode* node) {
         if (node == nullptr) return;
         freeTree(node->left);
@@ -434,7 +432,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);  // skip CSV header
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -463,10 +461,8 @@ public:
 // ============================================================
 // MODULE: Order Management
 // Member 1
-// Queue implemented using a singly linked list (FIFO).
-// Each order is stored in a heap-allocated OrderNode.
-// Dequeued nodes move to processedHead so markCompleted
-// can still find and update them after removal from queue.
+// Linked list queue for pending orders.
+// Processed orders are kept so their status can still be updated.
 // No STL used.
 // ============================================================
 
@@ -477,7 +473,7 @@ struct Order {
     char status[15];   // "Pending" or "Completed"
 };
 
-// linked list node for the order queue
+// node used by the order queue
 struct OrderNode {
     Order      data;
     OrderNode* next;
@@ -485,24 +481,24 @@ struct OrderNode {
 
 class OrderQueue {
 private:
-    static const int MAX_SIZE = 50;  // soft upper bound on pending orders
+    static const int MAX_SIZE = 50;  // pending order limit
 
-    OrderNode* front;          // head of the pending queue
-    OrderNode* rear;           // tail of the pending queue
-    OrderNode* processedHead;  // head of the dequeued/completed list
-    int        count;          // number of currently pending orders
+    OrderNode* front;          // first pending order
+    OrderNode* rear;           // last pending order
+    OrderNode* processedHead;  // orders already taken from the queue
+    int        count;          // pending order count
 
 public:
     OrderQueue() : front(nullptr), rear(nullptr), processedHead(nullptr), count(0) {}
 
     ~OrderQueue() {
-        // free all pending nodes
+        // clear pending orders
         while (front != nullptr) {
             OrderNode* temp = front;
             front = front->next;
             delete temp;
         }
-        // free all processed nodes
+        // clear processed orders
         while (processedHead != nullptr) {
             OrderNode* temp = processedHead;
             processedHead = processedHead->next;
@@ -530,7 +526,7 @@ public:
         count++;
     }
 
-    // remove from front; node moves to processedHead for markCompleted tracking
+    // take the first order and keep its node for completion status
     Order dequeue() {
         if (isEmpty()) {
             printf("No pending orders.\n");
@@ -547,7 +543,7 @@ public:
         count--;
 
         Order result = temp->data;
-        // prepend to processedHead so markCompleted can locate the order later
+        // keep this order in the processed list
         temp->next    = processedHead;
         processedHead = temp;
         return result;
@@ -582,7 +578,7 @@ public:
         printf("\n");
     }
 
-    // scan the processed list for orders marked Completed
+    // display processed orders that are completed
     void displayCompleted() {
         printf("\n--- Completed Orders ---\n");
         bool found = false;
@@ -618,7 +614,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);  // skip CSV header
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -636,7 +632,7 @@ public:
             strncpy(o.destination, fields[2], 49); o.destination[49] = '\0';
             strncpy(o.status,      fields[3], 14); o.status[14]      = '\0';
 
-            // completed orders from CSV go directly to processedHead
+            // completed orders start in the processed list
             if (strcmp(o.status, "Completed") == 0) {
                 OrderNode* newNode = new OrderNode();
                 newNode->data  = o;
@@ -654,8 +650,8 @@ public:
 // ============================================================
 // MODULE: Robot Assignment
 // Member 2
-// Circular Queue (array-based) for fair robot rotation.
-// Robots rotate so the same one is not always picked first.
+// Array circular queue for robot rotation.
+// This keeps assignment fair among available robots.
 // No STL used.
 // ============================================================
 
@@ -691,7 +687,7 @@ private:
             if (strcmp(robots[idx].status, "Maintenance") == 0) maintCount++;
         }
 
-        // print reason why no robot is free
+        // show why no robot can be assigned
         if (busyCount == count)
             printf("All robots are currently busy.\n");
         else if (maintCount == count)
@@ -715,7 +711,7 @@ public:
             printf("Robot queue is full.\n");
             return;
         }
-        rear = (rear + 1) % MAX_SIZE;  // wrap around using modulo
+        rear = (rear + 1) % MAX_SIZE;  // wrap to the front when needed
         if (rear == 0 && count > 0) {
             printf("[Circular Queue] Rear wrapped around to index 0.\n");
         }
@@ -723,7 +719,7 @@ public:
         count++;
     }
 
-    // returns a copy of the next available robot without removing it
+    // check the next free robot without changing its status
     Robot getNextAvailable() {
         int logPos = findNextAvailableLogical();
         if (logPos == -1) {
@@ -755,7 +751,7 @@ public:
                robots[idx].robotID, orderID);
     }
 
-    // getter for the last robot that was assigned a task
+    // last robot assigned by assignTask()
     const char* getLastAssignedRobotID() {
         return lastAssignedRobotID;
     }
@@ -796,7 +792,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);  // skip CSV header
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -828,14 +824,12 @@ public:
 // ============================================================
 // MODULE: Robot Navigation & Path Tracking
 // Member 3
-// Stack implemented using a singly linked list (LIFO).
-// Each push() allocates a new StackNode on the heap;
-// each pop() frees it. forwardPath[] is kept as a fixed-size
-// copy purely for CSV logging after the stack is cleared.
+// Linked list stack for tracking the robot path.
+// forwardPath keeps a copy for logging after the return path is printed.
 // No STL used.
 // ============================================================
 
-// linked list node for the navigation stack
+// node used by the navigation stack
 struct StackNode {
     Step       data;
     StackNode* next;
@@ -846,7 +840,7 @@ private:
     static const int MAX_PATH = 20;
 
     StackNode* top;
-    Step       forwardPath[MAX_PATH];  // copy of path for CSV logging after return
+    Step       forwardPath[MAX_PATH];  // saved path for CSV logging
     int        forwardCount;
 
 public:
@@ -892,7 +886,7 @@ public:
         return top->data;
     }
 
-    // print forward path using the saved copy (step 1 first)
+    // print the route from start to destination
     void displayForwardPath() {
         if (forwardCount == 0) {
             printf("Navigation stack is empty.\n");
@@ -908,7 +902,7 @@ public:
         printf("--------------------------------\n\n");
     }
 
-    // pop steps and print reverse direction for each one
+    // pop the stack to show the way back
     void returnToStart() {
         if (isEmpty()) {
             printf("No steps to retrace.\n");
@@ -937,18 +931,24 @@ public:
         forwardCount = 0;
     }
 
-    // expose saved forward path so main can log it after returnToStart()
+    // give main the saved path for the log file
     const Step* getForwardPath(int& count) {
         count = forwardCount;
         return forwardPath;
     }
 
-    // query warehouse tree for path, then push each step onto the stack
+    // load a normal path without any obstacle
     void loadPathFromWarehouse(WarehouseTree& tree,
                                const char* startZone,
                                const char* destination) {
+        loadPathFromWarehouse(tree, startZone, destination, "");
+    }
+
+    void loadPathFromWarehouse(WarehouseTree& tree,
+                               const char* startZone,
+                               const char* destination,
+                               const char* blockedLocation) {
         clearStack();
-        forwardCount = 0;
 
         int stepCount = 0;
         Step* pathSteps = tree.findPath(startZone, destination, stepCount);
@@ -959,7 +959,18 @@ public:
         }
 
         int limit = (stepCount < MAX_PATH) ? stepCount : MAX_PATH;
+
         for (int i = 0; i < limit; i++) {
+            if (blockedLocation != nullptr &&
+                blockedLocation[0] != '\0' &&
+                strcmp(pathSteps[i].location, blockedLocation) == 0) {
+                printf("\nObstacle detected at %s! Robot cannot proceed.\n", blockedLocation);
+                printf("Robot is backtracking to the starting point.\n");
+                returnToStart();
+                forwardCount = 0;
+                return;
+            }
+
             push(pathSteps[i]);
             forwardPath[i] = pathSteps[i];
         }
@@ -968,7 +979,7 @@ public:
 };
 
 // ============================================================
-// MAIN - Integrates all modules
+// MAIN - program menu and module connection
 // ============================================================
 
 static void printMenu() {
@@ -992,7 +1003,7 @@ static void printMenu() {
     printf("Enter choice: ");
 }
 
-// write completed journey steps to navigation.csv
+// save completed journey steps into navigation.csv
 static void logJourney(const char* journeyID, const char* robotID,
                         const char* orderID,
                         const Step* steps, int stepCount) {
@@ -1019,7 +1030,7 @@ int main() {
     CircularQueue    robotQueue;
     NavigationStack  navigationStack;
 
-    // load all data before showing the menu
+    // load the CSV files first
     printf("=== Loading System Data ===\n");
     warehouseTree.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(warehouse).csv");
     itemBST.loadFromCSV("G22_TP077824_TP080775_TP080003_TP079178_TP079462(items).csv");
@@ -1031,13 +1042,13 @@ int main() {
     char currentOrderID[10]  = "";
     bool taskInProgress      = false;
 
-    // count existing journeys in the log so IDs continue from where we left off
+    // continue journey IDs from the last saved log
     int journeyCount = 0;
     {
         std::ifstream navLog("G22_TP077824_TP080775_TP080003_TP079178_TP079462(navigation).csv");
         if (navLog.is_open()) {
             char line[256];
-            navLog.getline(line, 256);  // skip header
+            navLog.getline(line, 256);  // skip CSV header
             while (navLog.getline(line, 256)) {
                 if (line[0] == 'J') {
                     int n = atoi(line + 1);
@@ -1056,7 +1067,7 @@ int main() {
         switch (choice) {
 
             case 1: {
-                // add a new order to the queue
+                // add order
                 Order newOrder;
                 printf("Enter Order ID   : ");
                 scanf("%9s", newOrder.orderID);
@@ -1122,6 +1133,16 @@ int main() {
                 printf("  Located at : Zone=%s | Aisle=%s | Shelf=%s\n",
                        foundItem->zone, foundItem->aisle, foundItem->shelf);
 
+                char blockedLocation[50] = "";
+                printf("Enter obstacle location to simulate (NONE for no obstacle): ");
+                scanf(" %49[^\n]", blockedLocation);
+
+                if (strcmp(blockedLocation, "NONE") == 0 ||
+                    strcmp(blockedLocation, "none") == 0 ||
+                    strcmp(blockedLocation, "None") == 0) {
+                    blockedLocation[0] = '\0';
+                }
+
                 strncpy(currentOrderID, currentOrder.orderID, 9);
                 currentOrderID[9] = '\0';
                 robotQueue.assignTask(currentOrderID);
@@ -1131,8 +1152,14 @@ int main() {
 
                 // pass zone name so DFS picks the right shelf if duplicate names exist
                 navigationStack.loadPathFromWarehouse(
-                    warehouseTree, foundItem->zone, foundItem->shelf);
+                    warehouseTree, foundItem->zone, foundItem->shelf, blockedLocation);
 
+                if (navigationStack.isEmpty()) {
+                    printf("Navigation could not continue for %s. Order cannot proceed.\n",
+                           foundItem->shelf);
+                    robotQueue.releaseRobot(assignedRobotID);
+                    break;
+                }
                 navigationStack.displayForwardPath();
                 taskInProgress = true;
                 printf("Robot %s is navigating to %s.\n",
@@ -1141,13 +1168,13 @@ int main() {
             }
 
             case 3: {
-                // robot retraces path back and order is marked complete
+                // return the robot and finish the order
                 if (!taskInProgress) {
                     printf("No task is currently in progress.\n");
                     break;
                 }
 
-                // save forward path before returnToStart() clears the stack
+                // save the route before the stack is emptied
                 int pathCount = 0;
                 const Step* forwardSteps =
                     navigationStack.getForwardPath(pathCount);
