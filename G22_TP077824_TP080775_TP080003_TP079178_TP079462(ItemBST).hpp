@@ -1,11 +1,3 @@
-// ============================================================
-// Item Search and Management Module
-// Member 4
-// Binary Search Tree ordered by itemID.
-// Supports insert, search, delete, and inorder display.
-// No STL used.
-// ============================================================
-
 #ifndef ITEM_BST_HPP
 #define ITEM_BST_HPP
 
@@ -46,7 +38,6 @@ private:
         return node;
     }
 
-    // find the smallest node in a subtree (used in delete)
     BSTNode* findMin(BSTNode* node) {
         while (node->left != nullptr) node = node->left;
         return node;
@@ -60,12 +51,10 @@ private:
         } else if (cmp > 0) {
             node->right = deleteHelper(node->right, itemID);
         } else {
-            // Case 1: no children
             if (node->left == nullptr && node->right == nullptr) {
                 delete node;
                 return nullptr;
             }
-            // Case 2: one child
             if (node->left == nullptr) {
                 BSTNode* temp = node->right;
                 delete node;
@@ -76,7 +65,6 @@ private:
                 delete node;
                 return temp;
             }
-            // Case 3: two children - replace with inorder successor
             BSTNode* successor = findMin(node->right);
             node->data = successor->data;
             node->right = deleteHelper(node->right, successor->data.itemID);
@@ -110,7 +98,6 @@ private:
         return              searchHelper(node->right, itemID);
     }
 
-    // BST is ordered by ID so name search has to scan all nodes
     Item* searchByNameHelper(BSTNode* node, char* itemName) {
         if (node == nullptr) return nullptr;
         Item* leftResult = searchByNameHelper(node->left, itemName);
@@ -119,7 +106,6 @@ private:
         return searchByNameHelper(node->right, itemName);
     }
 
-    // free children before parent (post-order)
     void freeTree(BSTNode* node) {
         if (node == nullptr) return;
         freeTree(node->left);
@@ -127,7 +113,7 @@ private:
         delete node;
     }
 
-    void parseLine(char* line, char fields[][100], int& fieldCount) {
+    void parseLine(char* line, char fields[][100], int maxFields, int& fieldCount) {
         fieldCount = 0;
         int ci = 0;
         for (int i = 0; ; i++) {
@@ -137,9 +123,9 @@ private:
                 fieldCount++;
                 ci = 0;
                 if (c == '\0' || c == '\n' || c == '\r') break;
-                if (fieldCount >= 10) break;
+                if (fieldCount >= maxFields) break;
             } else {
-                fields[fieldCount][ci++] = c;
+                if (ci < 99) fields[fieldCount][ci++] = c;
             }
         }
     }
@@ -209,7 +195,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
@@ -218,7 +204,7 @@ public:
 
             char fields[6][100];
             int fc = 0;
-            parseLine(line, fields, fc);
+            parseLine(line, fields, 6, fc);
             if (fc < 5) continue;
 
             Item item;
@@ -235,4 +221,4 @@ public:
     }
 };
 
-#endif // ITEM_BST_HPP
+#endif

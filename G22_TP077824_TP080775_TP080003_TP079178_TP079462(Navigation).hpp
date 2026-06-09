@@ -1,38 +1,37 @@
-// ============================================================
-// Navigation & Path Tracking Module
-// Member 3
-// Stack (array-based, LIFO) - records each step the robot takes
-// so it can retrace back to start by popping in reverse order.
-// No STL used.
-// ============================================================
-
 #ifndef NAVIGATION_HPP
 #define NAVIGATION_HPP
 
 #include <cstring>
 #include <cstdio>
-#include "WarehouseTree.hpp"
+#include "G22_TP077824_TP080775_TP080003_TP079178_TP079462(WarehouseTree).hpp"
+
+struct StackNode {
+    Step       data;
+    StackNode* next;
+};
 
 class NavigationStack {
 private:
-    static const int MAX_SIZE = 20;
-    Step steps[MAX_SIZE];
-    int  top;
-    Step forwardPath[MAX_SIZE];  // copy of path for CSV logging after return
-    int  forwardCount;
+    static const int MAX_PATH = 20;
+
+    StackNode* top;
+    Step       forwardPath[MAX_PATH];
+    int        forwardCount;
 
 public:
-    NavigationStack() : top(-1), forwardCount(0) {}
+    NavigationStack() : top(nullptr), forwardCount(0) {}
 
-    bool isEmpty() { return top == -1; }
-    bool isFull()  { return top == MAX_SIZE - 1; }
+    ~NavigationStack() {
+        clearStack();
+    }
+
+    bool isEmpty() { return top == nullptr; }
 
     void push(Step s) {
-        if (isFull()) {
-            printf("Navigation stack is full.\n");
-            return;
-        }
-        steps[++top] = s;
+        StackNode* newNode = new StackNode();
+        newNode->data = s;
+        newNode->next = top;
+        top = newNode;
     }
 
     Step pop() {
@@ -44,7 +43,11 @@ public:
             empty.location[0]  = '\0';
             return empty;
         }
-        return steps[top--];
+        StackNode* temp = top;
+        Step s = temp->data;
+        top = top->next;
+        delete temp;
+        return s;
     }
 
     Step peek() {
@@ -55,26 +58,24 @@ public:
             empty.location[0]  = '\0';
             return empty;
         }
-        return steps[top];
+        return top->data;
     }
 
-    // print path from bottom to top (step 1 first)
     void displayForwardPath() {
-        if (isEmpty()) {
+        if (forwardCount == 0) {
             printf("Navigation stack is empty.\n");
             return;
         }
         printf("\n--- FORWARD NAVIGATION PATH ---\n");
-        for (int i = 0; i <= top; i++) {
+        for (int i = 0; i < forwardCount; i++) {
             printf("  Step %d: %-10s -> %s\n",
-                   steps[i].stepNumber,
-                   steps[i].direction,
-                   steps[i].location);
+                   forwardPath[i].stepNumber,
+                   forwardPath[i].direction,
+                   forwardPath[i].location);
         }
         printf("--------------------------------\n\n");
     }
 
-    // pop steps and print reverse direction for each one
     void returnToStart() {
         if (isEmpty()) {
             printf("No steps to retrace.\n");
@@ -95,21 +96,30 @@ public:
     }
 
     void clearStack() {
-        top = -1;
+        while (top != nullptr) {
+            StackNode* temp = top;
+            top = top->next;
+            delete temp;
+        }
+        forwardCount = 0;
     }
 
-    // expose saved forward path so main can log it after returnToStart()
     const Step* getForwardPath(int& count) {
         count = forwardCount;
         return forwardPath;
     }
 
-    // query warehouse tree for path, then push each step onto the stack
     void loadPathFromWarehouse(WarehouseTree& tree,
-                                const char* startZone,
-                                const char* destination) {
+                               const char* startZone,
+                               const char* destination) {
+        loadPathFromWarehouse(tree, startZone, destination, "");
+    }
+
+    void loadPathFromWarehouse(WarehouseTree& tree,
+                               const char* startZone,
+                               const char* destination,
+                               const char* blockedLocation) {
         clearStack();
-        forwardCount = 0;
 
         int stepCount = 0;
         Step* pathSteps = tree.findPath(startZone, destination, stepCount);
@@ -119,12 +129,24 @@ public:
             return;
         }
 
-        for (int i = 0; i < stepCount && i < MAX_SIZE; i++) {
+        int limit = (stepCount < MAX_PATH) ? stepCount : MAX_PATH;
+
+        for (int i = 0; i < limit; i++) {
+            if (blockedLocation != nullptr &&
+                blockedLocation[0] != '\0' &&
+                strcmp(pathSteps[i].location, blockedLocation) == 0) {
+                printf("\nObstacle detected at %s! Robot cannot proceed.\n", blockedLocation);
+                printf("Robot is backtracking to the starting point.\n");
+                returnToStart();
+                forwardCount = 0;
+                return;
+            }
+
             push(pathSteps[i]);
             forwardPath[i] = pathSteps[i];
         }
-        forwardCount = (stepCount < MAX_SIZE) ? stepCount : MAX_SIZE;
+        forwardCount = limit;
     }
 };
 
-#endif // NAVIGATION_HPP
+#endif

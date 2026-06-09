@@ -1,6 +1,3 @@
-// WAREHOUSE LAYOUT AND NAVIGATION MODULE
-// Task 5
-
 #ifndef WAREHOUSE_TREE_HPP
 #define WAREHOUSE_TREE_HPP
 
@@ -9,16 +6,15 @@
 #include <cstdlib>
 #include <fstream>
 
-// Step is defined here because Navigation.hpp needs it
 struct Step {
     int  stepNumber;
-    char direction[15];  // "Forward", "Left", "Right", "Backward"
+    char direction[15];
     char location[50];
 };
 
 struct TreeNode {
     char      name[50];
-    char      type[15];        // "Root", "Zone", "Aisle", "Shelf"
+    char      type[15];
     TreeNode* children[10];
     int       childCount;
 };
@@ -49,9 +45,6 @@ private:
             parent->children[parent->childCount++] = child;
     }
 
-    // recursive DFS - fills pathNodes when the target shelf is found
-    // zoneFilter makes sure we only match shelves inside the correct zone
-    // (needed when two zones have a shelf with the same name)
     bool tracePath(TreeNode* current, const char* target,
                    const char* zoneFilter,
                    TreeNode* pathNodes[], int& pathLen) {
@@ -75,11 +68,10 @@ private:
             if (tracePath(current->children[i], target, zoneFilter, pathNodes, pathLen))
                 return true;
         }
-        pathLen--;  // backtrack
+        pathLen--;
         return false;
     }
 
-    // free tree memory post-order (children before parent)
     void freeTree(TreeNode* node) {
         if (node == nullptr) return;
         for (int i = 0; i < node->childCount; i++)
@@ -87,7 +79,7 @@ private:
         delete node;
     }
 
-    void parseLine(char* line, char fields[][100], int& fieldCount) {
+    void parseLine(char* line, char fields[][100], int maxFields, int& fieldCount) {
         fieldCount = 0;
         int ci = 0;
         for (int i = 0; ; i++) {
@@ -97,9 +89,9 @@ private:
                 fieldCount++;
                 ci = 0;
                 if (c == '\0' || c == '\n' || c == '\r') break;
-                if (fieldCount >= 10) break;
+                if (fieldCount >= maxFields) break;
             } else {
-                fields[fieldCount][ci++] = c;
+                if (ci < 99) fields[fieldCount][ci++] = c;
             }
         }
     }
@@ -130,7 +122,6 @@ public:
             displayLayout(node->children[i], depth + 1);
     }
 
-    // runs DFS from root to find destinationName and converts nodes into Steps
     Step* findPath(const char* startName, const char* destinationName,
                    int& stepCount) {
         stepCount = 0;
@@ -157,7 +148,6 @@ public:
             steps[stepCount].location[49] = '\0';
 
             if (strcmp(pathNodes[i]->type, "Aisle") == 0) {
-                // alternate left and right for each aisle
                 if (aisleCount % 2 == 0)
                     strncpy(steps[stepCount].direction, "Left", 14);
                 else
@@ -181,7 +171,7 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);
 
         tableSize = 0;
         while (file.getline(line, 256) && tableSize < MAX_NODES) {
@@ -191,7 +181,7 @@ public:
 
             char fields[6][100];
             int fc = 0;
-            parseLine(line, fields, fc);
+            parseLine(line, fields, 6, fc);
             if (fc < 4) continue;
 
             int nodeID   = atoi(fields[0]);
@@ -206,10 +196,9 @@ public:
         }
         file.close();
 
-        // second pass: link each node to its parent
         for (int i = 0; i < tableSize; i++) {
             if (parentIDs[i] == 0) {
-                root = nodeTable[i];  // node with parentID 0 is the root
+                root = nodeTable[i];
                 continue;
             }
             bool parentFound = false;
@@ -230,4 +219,4 @@ public:
     }
 };
 
-#endif // WAREHOUSE_TREE_HPP
+#endif

@@ -1,11 +1,3 @@
-// ================================================================
-// Robot Assignment Module
-// Member 2
-// Uses a circular queue (array-based) to assign tasks to robots.
-// Robots rotate fairly so the same one doesn't always get picked.
-// No STL used.
-// ================================================================
-
 #ifndef ROBOT_QUEUE_HPP
 #define ROBOT_QUEUE_HPP
 
@@ -15,7 +7,7 @@
 
 struct Robot {
     char robotID[10];
-    char status[15];      // "Available", "Busy", "Maintenance"
+    char status[15];
     char currentTask[10];
 };
 
@@ -27,8 +19,9 @@ private:
     int   rear;
     int   count;
     char  lastAssignedRobotID[10];
+    int   rotationStart;
 
-    void parseLine(char* line, char fields[][100], int& fieldCount) {
+    void parseLine(char* line, char fields[][100], int maxFields, int& fieldCount) {
         fieldCount = 0;
         int ci = 0;
         for (int i = 0; ; i++) {
@@ -38,33 +31,28 @@ private:
                 fieldCount++;
                 ci = 0;
                 if (c == '\0' || c == '\n' || c == '\r') break;
-                if (fieldCount >= 10) break;
+                if (fieldCount >= maxFields) break;
             } else {
-                fields[fieldCount][ci++] = c;
+                if (ci < 99) fields[fieldCount][ci++] = c;
             }
         }
     }
 
-    // find the index of the next available robot, returns -1 if none found
-    int findNextAvailableIndex() {
+    int findNextAvailableLogical() {
         int busyCount  = 0;
         int maintCount = 0;
 
         for (int i = 0; i < count; i++) {
-            int idx = (front + i) % MAX_SIZE;
-
-            if (i > 0 && (front + i) % MAX_SIZE == 0) {
-                printf("[Circular Queue] Wrap-around: search resumed from index 0.\n");
-            }
+            int logPos = (rotationStart + i) % count;
+            int idx    = (front + logPos) % MAX_SIZE;
 
             if (strcmp(robots[idx].status, "Available") == 0) {
-                return idx;
+                return logPos;
             }
             if (strcmp(robots[idx].status, "Busy") == 0)        busyCount++;
             if (strcmp(robots[idx].status, "Maintenance") == 0) maintCount++;
         }
 
-        // print reason why no robot is free
         if (busyCount == count)
             printf("All robots are currently busy.\n");
         else if (maintCount == count)
@@ -76,7 +64,7 @@ private:
     }
 
 public:
-    CircularQueue() : front(0), rear(-1), count(0) {
+    CircularQueue() : front(0), rear(-1), count(0), rotationStart(0) {
         lastAssignedRobotID[0] = '\0';
     }
 
@@ -88,7 +76,7 @@ public:
             printf("Robot queue is full.\n");
             return;
         }
-        rear = (rear + 1) % MAX_SIZE;  // wrap around using modulo
+        rear = (rear + 1) % MAX_SIZE;
         if (rear == 0 && count > 0) {
             printf("[Circular Queue] Rear wrapped around to index 0.\n");
         }
@@ -96,36 +84,37 @@ public:
         count++;
     }
 
-    // returns a copy of the next available robot without removing it
     Robot getNextAvailable() {
-        int idx = findNextAvailableIndex();
-        if (idx == -1) {
+        int logPos = findNextAvailableLogical();
+        if (logPos == -1) {
             Robot empty;
             empty.robotID[0]     = '\0';
             empty.status[0]      = '\0';
             empty.currentTask[0] = '\0';
             return empty;
         }
-        return robots[idx];
+        return robots[(front + logPos) % MAX_SIZE];
     }
 
     void assignTask(char* orderID) {
-        int idx = findNextAvailableIndex();
-        if (idx == -1) {
+        int logPos = findNextAvailableLogical();
+        if (logPos == -1) {
             lastAssignedRobotID[0] = '\0';
             return;
         }
+        int idx = (front + logPos) % MAX_SIZE;
         strncpy(robots[idx].status, "Busy", 14);
         robots[idx].status[14] = '\0';
         strncpy(robots[idx].currentTask, orderID, 9);
         robots[idx].currentTask[9] = '\0';
         strncpy(lastAssignedRobotID, robots[idx].robotID, 9);
         lastAssignedRobotID[9] = '\0';
+
+        rotationStart = (logPos + 1) % count;
         printf("Robot %s assigned to order %s.\n",
                robots[idx].robotID, orderID);
     }
 
-    // getter for the last robot that was assigned a task
     const char* getLastAssignedRobotID() {
         return lastAssignedRobotID;
     }
@@ -135,8 +124,8 @@ public:
             int idx = (front + i) % MAX_SIZE;
             if (strcmp(robots[idx].robotID, robotID) == 0) {
                 strncpy(robots[idx].status, "Available", 14);
-                robots[idx].status[14]      = '\0';
-                robots[idx].currentTask[0]  = '\0';
+                robots[idx].status[14]     = '\0';
+                robots[idx].currentTask[0] = '\0';
                 printf("Robot %s is now Available.\n", robotID);
                 return;
             }
@@ -166,16 +155,16 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
             if (len > 0 && line[len - 1] == '\r') line[len - 1] = '\0';
             if (strlen(line) == 0) continue;
 
-            char fields[5][100];
+            char fields[4][100];
             int fc = 0;
-            parseLine(line, fields, fc);
+            parseLine(line, fields, 4, fc);
             if (fc < 2) continue;
 
             Robot r;
@@ -195,4 +184,4 @@ public:
     }
 };
 
-#endif // ROBOT_QUEUE_HPP
+#endif

@@ -1,11 +1,3 @@
-// ============================================================
-// Module      : Order Management
-// Member      : Member 1
-// Data Structure: Queue (array-based, linear)
-// Description : Handles incoming customer orders using a queue.
-//               Orders are processed first-in first-out (FIFO).
-// ============================================================
-
 #ifndef ORDER_QUEUE_HPP
 #define ORDER_QUEUE_HPP
 
@@ -17,18 +9,24 @@ struct Order {
     char orderID[10];
     char itemName[30];
     char destination[50];
-    char status[15];   // "Pending" or "Completed"
+    char status[15];
+};
+
+struct OrderNode {
+    Order      data;
+    OrderNode* next;
 };
 
 class OrderQueue {
 private:
-    static const int MAX_SIZE = 10;
-    Order orders[MAX_SIZE];
-    int   front;   // index of next order to dequeue
-    int   rear;    // index of last added order (-1 if empty)
-    int   count;   // number of active orders
+    static const int MAX_SIZE = 50;
 
-    void parseLine(char* line, char fields[][100], int& fieldCount) {
+    OrderNode* front;
+    OrderNode* rear;
+    OrderNode* processedHead;
+    int        count;
+
+    void parseLine(char* line, char fields[][100], int maxFields, int& fieldCount) {
         fieldCount = 0;
         int ci = 0;
         for (int i = 0; ; i++) {
@@ -38,38 +36,49 @@ private:
                 fieldCount++;
                 ci = 0;
                 if (c == '\0' || c == '\n' || c == '\r') break;
-                if (fieldCount >= 10) break;
+                if (fieldCount >= maxFields) break;
             } else {
-                fields[fieldCount][ci++] = c;
+                if (ci < 99) fields[fieldCount][ci++] = c;
             }
         }
     }
 
 public:
-    OrderQueue() : front(0), rear(-1), count(0) {}
+    OrderQueue() : front(nullptr), rear(nullptr), processedHead(nullptr), count(0) {}
 
-    bool isEmpty() { return count == 0; }
+    ~OrderQueue() {
+        while (front != nullptr) {
+            OrderNode* temp = front;
+            front = front->next;
+            delete temp;
+        }
+        while (processedHead != nullptr) {
+            OrderNode* temp = processedHead;
+            processedHead = processedHead->next;
+            delete temp;
+        }
+    }
 
-    // queue is full when all 10 slots are occupied
-    bool isFull() { return count == MAX_SIZE; }
+    bool isEmpty() { return front == nullptr; }
+    bool isFull()  { return count >= MAX_SIZE; }
 
     void enqueue(Order o) {
         if (isFull()) {
             printf("Order queue is full.\n");
             return;
         }
-        // if rear hit the end but slots are free at the front, shift everything left
-        if (rear == MAX_SIZE - 1) {
-            for (int i = front; i <= rear; i++)
-                orders[i - front] = orders[i];
-            rear  = rear - front;
-            front = 0;
+        OrderNode* newNode = new OrderNode();
+        newNode->data = o;
+        newNode->next = nullptr;
+        if (rear == nullptr) {
+            front = rear = newNode;
+        } else {
+            rear->next = newNode;
+            rear = newNode;
         }
-        orders[++rear] = o;
         count++;
     }
 
-    // dequeue moves front forward, old slot stays for markCompleted()
     Order dequeue() {
         if (isEmpty()) {
             printf("No pending orders.\n");
@@ -80,21 +89,37 @@ public:
             empty.status[0]      = '\0';
             return empty;
         }
-        Order o = orders[front];
-        front++;
+        OrderNode* temp = front;
+        front = front->next;
+        if (front == nullptr) rear = nullptr;
         count--;
-        return o;
+
+        Order result = temp->data;
+        temp->next    = processedHead;
+        processedHead = temp;
+        return result;
     }
 
-    // show orders that are still pending (from front to rear)
+    Order peekFront() {
+        if (isEmpty()) {
+            Order empty;
+            empty.orderID[0]     = '\0';
+            empty.itemName[0]    = '\0';
+            empty.destination[0] = '\0';
+            empty.status[0]      = '\0';
+            return empty;
+        }
+        return front->data;
+    }
+
     void displayPending() {
         printf("\n--- Pending Orders ---\n");
         bool found = false;
-        for (int i = front; i <= rear; i++) {
-            if (strcmp(orders[i].status, "Pending") == 0) {
+        for (OrderNode* cur = front; cur != nullptr; cur = cur->next) {
+            if (strcmp(cur->data.status, "Pending") == 0) {
                 printf("  %-10s | %-20s | %-35s | %s\n",
-                       orders[i].orderID, orders[i].itemName,
-                       orders[i].destination, orders[i].status);
+                       cur->data.orderID, cur->data.itemName,
+                       cur->data.destination, cur->data.status);
                 found = true;
             }
         }
@@ -102,15 +127,14 @@ public:
         printf("\n");
     }
 
-    // scan entire array including already-dequeued slots for completed ones
     void displayCompleted() {
         printf("\n--- Completed Orders ---\n");
         bool found = false;
-        for (int i = 0; i <= rear; i++) {
-            if (strcmp(orders[i].status, "Completed") == 0) {
+        for (OrderNode* cur = processedHead; cur != nullptr; cur = cur->next) {
+            if (strcmp(cur->data.status, "Completed") == 0) {
                 printf("  %-10s | %-20s | %-35s | %s\n",
-                       orders[i].orderID, orders[i].itemName,
-                       orders[i].destination, orders[i].status);
+                       cur->data.orderID, cur->data.itemName,
+                       cur->data.destination, cur->data.status);
                 found = true;
             }
         }
@@ -119,10 +143,10 @@ public:
     }
 
     void markCompleted(char* orderID) {
-        for (int i = 0; i <= rear; i++) {
-            if (strcmp(orders[i].orderID, orderID) == 0) {
-                strncpy(orders[i].status, "Completed", 14);
-                orders[i].status[14] = '\0';
+        for (OrderNode* cur = processedHead; cur != nullptr; cur = cur->next) {
+            if (strcmp(cur->data.orderID, orderID) == 0) {
+                strncpy(cur->data.status, "Completed", 14);
+                cur->data.status[14] = '\0';
                 printf("Order %s marked as Completed.\n", orderID);
                 return;
             }
@@ -138,16 +162,16 @@ public:
         }
 
         char line[256];
-        file.getline(line, 256);  // skip header
+        file.getline(line, 256);
 
         while (file.getline(line, 256)) {
             int len = strlen(line);
             if (len > 0 && line[len - 1] == '\r') line[len - 1] = '\0';
             if (strlen(line) == 0) continue;
 
-            char fields[6][100];
+            char fields[5][100];
             int fc = 0;
-            parseLine(line, fields, fc);
+            parseLine(line, fields, 5, fc);
             if (fc < 4) continue;
 
             Order o;
@@ -156,11 +180,18 @@ public:
             strncpy(o.destination, fields[2], 49); o.destination[49] = '\0';
             strncpy(o.status,      fields[3], 14); o.status[14]      = '\0';
 
-            enqueue(o);
+            if (strcmp(o.status, "Completed") == 0) {
+                OrderNode* newNode = new OrderNode();
+                newNode->data  = o;
+                newNode->next  = processedHead;
+                processedHead  = newNode;
+            } else {
+                enqueue(o);
+            }
         }
         file.close();
         printf("Orders loaded successfully.\n");
     }
 };
 
-#endif // ORDER_QUEUE_HPP
+#endif
